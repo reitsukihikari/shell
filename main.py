@@ -32,7 +32,7 @@ class ShellPlugin(Star):
             response = requests.post(target_url, json={"command": command}, timeout=5)
             if response.ok:
                 result_text = response.text
-                yield event.plain_result(f"执行结果:\n{result_text}")
+                yield event.plain_result(f"{result_text}")
             else:
                 yield event.plain_result(f"目标容器返回错误: {response.status_code}")
         except requests.RequestException as e:
