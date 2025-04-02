@@ -13,7 +13,7 @@ class ShellPlugin(Star):
         """
         将 /shell 后的文本作为命令转发给 shell 容器执行，并反馈结果。
         """
-        prefix = "/shell"
+        prefix = "shell"
         message_str = event.message_str.strip()
         if not message_str.startswith(prefix):
             yield event.plain_result("命令格式错误，应以 /shell 开头。")
