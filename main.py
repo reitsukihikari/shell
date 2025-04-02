@@ -1,21 +1,43 @@
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+import requests
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
+@register("shell_plugin", "YourName", "Shell 命令执行插件", "1.0.0")
+class ShellPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
-    
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        '''这是一个 hello world 指令''' # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+
+    @filter.command("shell")
+    async def shell_command(self, event: AstrMessageEvent):
+        """
+        将 /shell 后的文本作为命令转发给 shell 容器执行，并反馈结果。
+        """
+        prefix = "/shell"
+        message_str = event.message_str.strip()
+        if not message_str.startswith(prefix):
+            yield event.plain_result("命令格式错误，应以 /shell 开头。")
+            return
+
+        command = message_str[len(prefix):].strip()
+        if not command:
+            yield event.plain_result("未提供命令。")
+            return
+
+        logger.info(f"收到来自 {event.get_sender_name()} 的 shell 命令: {command}")
+
+        # 目标容器地址，容器名为 "shell"
+        target_url = "http://shell:5000/execute"
+        try:
+            response = requests.post(target_url, json={"command": command}, timeout=5)
+            if response.ok:
+                result_text = response.text
+                yield event.plain_result(f"执行结果:\n{result_text}")
+            else:
+                yield event.plain_result(f"目标容器返回错误: {response.status_code}")
+        except requests.RequestException as e:
+            logger.error(f"请求目标容器失败: {e}")
+            yield event.plain_result("无法连接目标容器。")
 
     async def terminate(self):
-        '''可选择实现 terminate 函数，当插件被卸载/停用时会调用。'''
+        pass
