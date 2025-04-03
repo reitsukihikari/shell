@@ -10,7 +10,10 @@ from astrbot.core.star.filter.event_message_type import EventMessageType
 
 def text_to_image(text, font_path=None, font_size=14):
     font = ImageFont.load_default() if not font_path else ImageFont.truetype(font_path, font_size)
+    # 按行分割文本，保留特殊字符，并扩展制表符为4个空格
     lines = text.splitlines() or ['']
+    lines = [line.expandtabs(4) for line in lines]
+    
     dummy_img = Image.new('RGB', (1, 1))
     dummy_draw = ImageDraw.Draw(dummy_img)
     max_width = 0
@@ -24,12 +27,14 @@ def text_to_image(text, font_path=None, font_size=14):
     line_height = max(line_heights)
     img_width = max_width + 20
     img_height = line_height * len(lines) + 20
+
     img = Image.new('RGB', (img_width, img_height), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     y_text = 10
     for line in lines:
         draw.text((10, y_text), line, font=font, fill=(0, 0, 0))
         y_text += line_height
+
     output = io.BytesIO()
     img.save(output, format='PNG')
     output.seek(0)
@@ -49,11 +54,10 @@ class ShellPlugin(Star):
         prefix = "shell"
         message_str = event.get_message_str()
         raw_command = message_str[len(prefix):]
-        lines = [line.strip() for line in raw_command.splitlines()]
-        sanitized_command = "\n".join(lines)
-        sanitized_command = re.sub(r'[\x00-\x1F\x7F]', '', sanitized_command)
+        # 移除除制表符(\t)、换行(\n)和回车(\r)外的其他控制字符
+        sanitized_command = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', raw_command)
 
-        if not sanitized_command.strip():
+        if not sanitized_command:
             yield event.plain_result("未提供要执行的命令。")
             return
 
@@ -72,12 +76,10 @@ class ShellPlugin(Star):
 
         # 将结果文本转换为图片
         image_bytes = text_to_image(result_text)
-        # 将 BytesIO 数据写入临时文件
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
             tmp_file.write(image_bytes.getvalue())
             tmp_path = tmp_file.name
 
-        # 发送图片（传递临时文件路径）
         yield event.image_result(tmp_path)
 
         try:
