@@ -2,11 +2,19 @@
 
 （已在 qq official webhook + linux 测试）
 
-Shell 插件 命令：/shell xxx
+Shell 插件 用户命令：/shell xxx
 
-其中 xxx 会发送到另一个目标容器执行 shell 命令。
+其中 xxx 会发送到另一个目标容器执行 shell 命令，以 png 形式返回输出。
 
 由于官方 qq api 屏蔽链接或文件名，需要将目标容器的输出渲染成图像。
+
+当且仅当用户在群聊输入
+
+```bash
+/shell exit
+```
+
+会让伪终端关闭，下次使用 /shell 将重新打开进程。
 
 ## 目标容器构建方式
 
