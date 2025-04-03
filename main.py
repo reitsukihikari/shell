@@ -1,9 +1,33 @@
 import re
 import requests
+import io
+from PIL import Image, ImageDraw, ImageFont
 from astrbot.api import logger
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.event_message_type import EventMessageType
+
+def text_to_image(text, font_path=None, font_size=14):
+    # 加载字体（若未指定则使用默认字体）
+    font = ImageFont.load_default() if not font_path else ImageFont.truetype(font_path, font_size)
+    lines = text.splitlines() or ['']
+    # 计算图片尺寸
+    max_width = max(font.getsize(line)[0] for line in lines)
+    line_height = font.getsize('A')[1]
+    img_width = max_width + 20
+    img_height = line_height * len(lines) + 20
+    # 创建白色背景图
+    img = Image.new('RGB', (img_width, img_height), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    y_text = 10
+    for line in lines:
+        draw.text((10, y_text), line, font=font, fill=(0, 0, 0))
+        y_text += line_height
+    # 将图片保存到内存缓冲区
+    output = io.BytesIO()
+    img.save(output, format='PNG')
+    output.seek(0)
+    return output
 
 @register("shell_plugin", "reika", "Shell 命令执行插件", "1.0.0")
 class ShellPlugin(Star):
@@ -14,7 +38,7 @@ class ShellPlugin(Star):
     async def shell_command(self, event: AstrMessageEvent):
         """
         接收到 “shell” 命令后，将后续文本作为命令转发给 shell 容器执行，
-        将结果返回，并写入当前目录 log 文件（不存在则创建）。
+        将结果以图片形式返回，并写入当前目录 log 文件（不存在则创建）。
         """
         prefix = "shell"
         message_str = event.get_message_str()
@@ -29,19 +53,21 @@ class ShellPlugin(Star):
 
         logger.info(f"收到来自 {event.get_sender_name()} 的 Shell 命令: {sanitized_command}")
 
-        target_url = "http://shell:5000/execute"
+        target_url = "http://shell:5001/execute"
         try:
             response = requests.post(target_url, json={"command": sanitized_command}, timeout=5)
             if response.ok:
                 result_text = response.text
-                yield event.plain_result(result_text)
             else:
                 result_text = f"目标容器返回错误: {response.status_code}"
-                yield event.plain_result(result_text)
         except requests.RequestException as e:
             logger.error(f"请求目标容器失败: {e}")
             result_text = "无法连接目标容器。"
-            yield event.plain_result(result_text)
+
+        # 将结果文本转换为图片
+        image_bytes = text_to_image(result_text)
+        # 发送图片（需根据具体 API 调用适配图片消息发送方式）
+        yield event.image_result(image_bytes)
 
         try:
             with open("log", "a", encoding="utf-8") as f:
