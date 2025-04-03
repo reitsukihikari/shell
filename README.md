@@ -1,4 +1,4 @@
-# helloworld
+# shell_plugin
 
 AstrBot 插件模板
 
