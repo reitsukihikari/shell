@@ -1,6 +1,7 @@
 import re
 import requests
 import io
+import tempfile
 from PIL import Image, ImageDraw, ImageFont
 from astrbot.api import logger
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
@@ -71,8 +72,13 @@ class ShellPlugin(Star):
 
         # 将结果文本转换为图片
         image_bytes = text_to_image(result_text)
-        # 发送图片（需根据具体 API 调用适配图片消息发送方式）
-        yield event.image_result(image_bytes)
+        # 将 BytesIO 数据写入临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
+            tmp_file.write(image_bytes.getvalue())
+            tmp_path = tmp_file.name
+
+        # 发送图片（传递临时文件路径）
+        yield event.image_result(tmp_path)
 
         try:
             with open("log", "a", encoding="utf-8") as f:
