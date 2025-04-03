@@ -13,17 +13,12 @@ class ShellPlugin(Star):
     @filter.command("shell", event_message_type=EventMessageType.ALL)
     async def shell_command(self, event: AstrMessageEvent):
         """
-        接收到 “shell” 命令后，将后续文本作为命令转发给 shell 容器执行，并将结果返回。
-        该命令在私聊和群聊中都有效。
+        接收到 “shell” 命令后，将后续文本作为命令转发给 shell 容器执行，
+        将结果返回，并写入当前目录 log 文件（不存在则创建）。
         """
         prefix = "shell"
         message_str = event.get_message_str()
-
-        # 取出 /shell 之后的所有文本（包括换行），并做必要处理
         raw_command = message_str[len(prefix):]
-
-        # 示例：去除每一行开头和结尾的空白，并过滤掉不可见控制字符
-        # 如果不需要过滤控制字符，可删去相应的 re.sub
         lines = [line.strip() for line in raw_command.splitlines()]
         sanitized_command = "\n".join(lines)
         sanitized_command = re.sub(r'[\x00-\x1F\x7F]', '', sanitized_command)
@@ -36,18 +31,23 @@ class ShellPlugin(Star):
 
         target_url = "http://shell:5000/execute"
         try:
-            # 通过 JSON 传递命令，默认会转义引号、换行等
             response = requests.post(target_url, json={"command": sanitized_command}, timeout=5)
             if response.ok:
-                yield event.plain_result(response.text)
+                result_text = response.text
+                yield event.plain_result(result_text)
             else:
-                yield event.plain_result(f"目标容器返回错误: {response.status_code}")
+                result_text = f"目标容器返回错误: {response.status_code}"
+                yield event.plain_result(result_text)
         except requests.RequestException as e:
             logger.error(f"请求目标容器失败: {e}")
-            yield event.plain_result("无法连接目标容器。")
+            result_text = "无法连接目标容器。"
+            yield event.plain_result(result_text)
+
+        try:
+            with open("log", "a", encoding="utf-8") as f:
+                f.write(result_text + "\n")
+        except Exception as log_e:
+            logger.error(f"写入 log 文件失败: {log_e}")
 
     async def terminate(self):
-        """
-        插件关闭或卸载前的收尾操作，暂不需要任何处理。
-        """
         pass
