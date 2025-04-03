@@ -8,22 +8,27 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.event_message_type import EventMessageType
 
 def text_to_image(text, font_path=None, font_size=14):
-    # 加载字体（若未指定则使用默认字体）
     font = ImageFont.load_default() if not font_path else ImageFont.truetype(font_path, font_size)
     lines = text.splitlines() or ['']
-    # 计算图片尺寸
-    max_width = max(font.getsize(line)[0] for line in lines)
-    line_height = font.getsize('A')[1]
+    dummy_img = Image.new('RGB', (1, 1))
+    dummy_draw = ImageDraw.Draw(dummy_img)
+    max_width = 0
+    line_heights = []
+    for line in lines:
+        bbox = dummy_draw.textbbox((0, 0), line, font=font)
+        width = bbox[2] - bbox[0]
+        height = bbox[3] - bbox[1]
+        max_width = max(max_width, width)
+        line_heights.append(height)
+    line_height = max(line_heights)
     img_width = max_width + 20
     img_height = line_height * len(lines) + 20
-    # 创建白色背景图
     img = Image.new('RGB', (img_width, img_height), color=(255, 255, 255))
     draw = ImageDraw.Draw(img)
     y_text = 10
     for line in lines:
         draw.text((10, y_text), line, font=font, fill=(0, 0, 0))
         y_text += line_height
-    # 将图片保存到内存缓冲区
     output = io.BytesIO()
     img.save(output, format='PNG')
     output.seek(0)
